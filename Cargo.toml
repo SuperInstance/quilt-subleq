@@ -1,0 +1,24 @@
+[package]
+name = "quilt-subleq"
+version = "0.1.0"
+edition = "2021"
+description = "Quilt on Subleq, and Subleq on Quilt. Distribution of reality."
+license = "MIT"
+
+[lib]
+name = "quilt_subleq"
+path = "src/lib.rs"
+
+[[example]]
+name = "01_quilt_as_subleq"
+path = "examples/01_quilt_as_subleq.rs"
+
+[[example]]
+name = "02_subleq_as_quilt"
+path = "examples/02_subleq_as_quilt.rs"
+
+[[example]]
+name = "03_distribution_of_reality"
+path = "examples/03_distribution_of_reality.rs"
+
+[dependencies]
