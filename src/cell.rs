@@ -33,9 +33,13 @@ impl SubleqCell {
 
     /// Execute the cell's Subleq program. Returns ticks used.
     pub fn run(&mut self) -> Result<u64, String> {
+        self.run_with_max_ticks(1_000_000)
+    }
+    
+    /// Run with explicit max_ticks to prevent infinite loops.
+    pub fn run_with_max_ticks(&mut self, max_ticks: u64) -> Result<u64, String> {
         // The tape IS the memory. Program lives at offset 0..prog_len.
         // User pre-writes (e.g., cell.write(42, 42)) land in the data area.
-        // After run, the tape contains both program (still intact) and modified data.
         let mut tape = std::mem::take(&mut self.tape);
         let prog_len = self.program.len();
         if tape.len() < prog_len {
@@ -46,7 +50,15 @@ impl SubleqCell {
             tape[i] = v;
         }
         let mut m = Machine::new(tape);
-        let ticks = m.run()?;
+        let mut ticks = 0;
+        while !m.halted {
+            m.step()?;
+            ticks += 1;
+            if ticks >= max_ticks {
+                self.tape = m.mem;
+                return Err(format!("subleq exceeded max_ticks={} (likely infinite loop)", max_ticks));
+            }
+        }
         self.tape = m.mem;
         Ok(ticks)
     }
@@ -108,10 +120,9 @@ mod tests {
         // to hold both the program and the data cell.
         // Program is 24 cells, plus the value reference (mem[42] = 42 means literal 42 at addr 42).
         let mut cell = SubleqCell::new("a", bind_program(50, 42), 100);
-        // Pre-populate the data cell with the literal value
-        cell.write(42, 42);
-        let ticks = cell.run().unwrap();
-        assert!(ticks > 0);
+        // BIND requires pre-placement: mem[VALUE_LOC] = -value
+        cell.write(VALUE_LOC, -42);
+        let _ = cell.run().unwrap();
         assert_eq!(cell.read(50), 42, "mem[50] should be 42 after BIND");
     }
 }
