@@ -1,5 +1,24 @@
-//! End-to-end tests for the Quilt-Subleq substrate.
+/// End-to-end tests for the Quilt-Subleq substrate.
 
+use super::*;
+use quilt_as_subleq::*;
+
+
+/// Run a program against a shared tape. Returns the final tape.
+fn run_on_shared_tape(prog: Vec<i64>, mut tape: Vec<i64>) -> Vec<i64> {
+    // Place program at offset 0 (program overrides any data at those positions)
+    for (i, &v) in prog.iter().enumerate() {
+        while tape.len() <= i { tape.push(0); }
+        tape[i] = v;
+    }
+    let mut m = subleq::Machine::new(tape);
+    while !m.halted {
+        m.step().unwrap();
+    }
+    m.mem
+}
+
+/// End-to-end tests for the Quilt-Subleq substrate.
 use super::*;
 use quilt_as_subleq::*;
 
@@ -280,4 +299,35 @@ fn bind_then_effect_yields_correct_value() {
     cell.program = p2;
     let _ = cell.run().unwrap();
     assert_eq!(cell.tape[10], 6, "after BIND(5) + EFFECT, mem[10] should be 6");
+}
+
+#[test]
+fn full_knowledge_crew_pattern_in_subleq() {
+    // Simulate the 4-cell quilt-claw crew via the Subleq substrate on a
+    // single shared tape. Each cell's program runs against the tape,
+    // reading upstream outputs and writing its own.
+    let mut tape = setup_preplaced();
+    
+    // cell.researcher: BIND(10, 7) - writes research summary
+    tape[VALUE_LOC] = -7;
+    tape = run_on_shared_tape(bind_program(10, 7), tape);
+    assert_eq!(tape[10], 7, "researcher.BIND(10, 7)");
+    
+    // cell.teacher: BIND(20, 5) - writes QA-pair score
+    tape[VALUE_LOC] = -5;
+    tape = run_on_shared_tape(bind_program(20, 5), tape);
+    assert_eq!(tape[20], 5, "teacher.BIND(20, 5)");
+    
+    // cell.critic: BIND(30, 3) - writes confidence
+    tape[VALUE_LOC] = -3;
+    tape = run_on_shared_tape(bind_program(30, 3), tape);
+    assert_eq!(tape[30], 3, "critic.BIND(30, 3)");
+    
+    // cell.distiller: EFFECT(40) - increments final-entry counter
+    tape = run_on_shared_tape(effect_program(40), tape);
+    assert_eq!(tape[40], 1, "distiller.EFFECT(40) — first tick");
+    
+    // Run distiller again — counter goes to 2
+    tape = run_on_shared_tape(effect_program(40), tape);
+    assert_eq!(tape[40], 2, "distiller.EFFECT(40) — second tick");
 }
